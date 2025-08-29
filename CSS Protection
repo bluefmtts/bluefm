@@ -1,0 +1,73 @@
+/* Disable text selection */
+.protected-content {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    
+    /* Disable highlighting */
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    
+    /* Disable drag */
+    -webkit-user-drag: none;
+    -khtml-user-drag: none;
+    -moz-user-drag: none;
+    -o-user-drag: none;
+    user-drag: none;
+}
+
+/* Disable image saving */
+img {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    pointer-events: none;
+    -webkit-user-drag: none;
+    -khtml-user-drag: none;
+    -moz-user-drag: none;
+    -o-user-drag: none;
+    user-drag: none;
+}
+
+/* Hide content when developer tools are open */
+@media (max-height: 500px) and (min-width: 800px) {
+    .protected-content {
+        display: none !important;
+    }
+    .dev-tools-warning {
+        display: block !important;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: #000;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+    }
+}
+
+.dev-tools-warning {
+    display: none;
+}
+
+/* Disable print styles */
+@media print {
+    .protected-content {
+        display: none !important;
+    }
+    body::after {
+        content: "Content is protected and cannot be printed.";
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 24px;
+        color: #000;
+    }
+}
