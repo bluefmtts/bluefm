@@ -1,73 +1,136 @@
-// Simple Firebase Configuration with Connection Management
-const getFirebaseConfig = () => {
-    const isDevelopment = window.location.hostname === 'localhost' || 
-                         window.location.hostname === '127.0.0.1';
+const { useState, useEffect, useContext, createContext } = React;
+
+const AuthContext = createContext();
+
+const AuthProvider = ({ children }) => {
+    const [user, setUser] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [error, setError] = useState(null);
     
-    return {
-        apiKey: "AIzaSyC6yENwSy7BixcQS7rf0eWKmTA5Vhh5Xbo",
-        authDomain: "tts-bot-db.firebaseapp.com",
-        databaseURL: "https://tts-bot-db-default-rtdb.firebaseio.com",
-        projectId: "tts-bot-db",
-        storageBucket: "tts-bot-db.firebasestorage.app",
-        messagingSenderId: "47722242167",
-        appId: "1:47722242167:web:75550df71113d97db2e672",
-        measurementId: "G-VGH8LNSS6M"
+    // Admin emails - make sure ADMIN_EMAILS exists
+    const ADMIN_EMAILS = window.ADMIN_EMAILS || ['vikassingh44999@gmail.com'];
+    
+    // Check admin status
+    const checkAdminStatus = (email) => {
+        if (!email || !ADMIN_EMAILS) return false;
+        return ADMIN_EMAILS.includes(email);
     };
-};
-
-// Connection state
-let connectionState = {
-    isOnline: true,
-    isConnected: false,
-    retryCount: 0
-};
-
-// Initialize Firebase with better error handling
-try {
-    const firebaseConfig = getFirebaseConfig();
     
-    if (!firebase.apps.length) {
-        firebase.initializeApp(firebaseConfig);
-    }
-    
-    const auth = firebase.auth();
-    const db = firebase.firestore();
-    const storage = firebase.storage();
-    
-    // IMPORTANT: Configure Firestore for better performance
-    db.settings({
-        cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
-        experimentalForceLongPolling: false
-    });
-    
-    // Enable offline persistence
-    db.enablePersistence({ synchronizeTabs: true })
-        .then(() => {
-            console.log('📱 Offline persistence enabled');
-            connectionState.isConnected = true;
-        })
-        .catch((err) => {
-            console.warn('⚠️ Persistence warning:', err.code);
-            // Continue anyway
-            connectionState.isConnected = true;
+    useEffect(() => {
+        const unsubscribe = auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                setUser(user);
+                setIsAdmin(checkAdminStatus(user.email));
+                
+                // Create/update user document
+                try {
+                    await db.collection('users').doc(user.uid).set({
+                        email: user.email,
+                        displayName: user.displayName || '',
+                        photoURL: user.photoURL || '',
+                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+                } catch (error) {
+                    console.error('Error updating user document:', error);
+                }
+            } else {
+                setUser(null);
+                setIsAdmin(false);
+            }
+            setLoading(false);
         });
+        
+        return () => unsubscribe();
+    }, []);
     
-    // Monitor connection
-    const connectedRef = firebase.database().ref('.info/connected');
-    connectedRef.on('value', (snapshot) => {
-        connectionState.isOnline = snapshot.val() === true;
-        console.log(connectionState.isOnline ? '🟢 Firebase connected' : '🔴 Firebase disconnected');
-    });
+    // Rest of your auth functions...
+    const signIn = async (email, password) => {
+        try {
+            setError(null);
+            const result = await auth.signInWithEmailAndPassword(email, password);
+            return result.user;
+        } catch (error) {
+            console.error('Sign in error:', error);
+            setError(error.message);
+            throw error;
+        }
+    };
     
-    // Admin emails
-    const ADMIN_EMAILS = ['vikassingh44999@gmail.com'];
+    const signUp = async (email, password, displayName = '') => {
+        try {
+            setError(null);
+            const result = await auth.createUserWithEmailAndPassword(email, password);
+            
+            if (displayName && result.user) {
+                await result.user.updateProfile({ displayName });
+            }
+            
+            return result.user;
+        } catch (error) {
+            console.error('Sign up error:', error);
+            setError(error.message);
+            throw error;
+        }
+    };
     
-    console.log('🔥 Firebase initialized successfully');
-    console.log('📧 Admin emails configured');
+    const signInWithGoogle = async () => {
+        try {
+            setError(null);
+            const provider = new firebase.auth.GoogleAuthProvider();
+            const result = await auth.signInWithPopup(provider);
+            return result.user;
+        } catch (error) {
+            console.error('Google sign in error:', error);
+            setError(error.message);
+            throw error;
+        }
+    };
     
-} catch (error) {
-    console.error('❌ Firebase initialization error:', error);
-}
+    const signOut = async () => {
+        try {
+            await auth.signOut();
+            setUser(null);
+            setIsAdmin(false);
+        } catch (error) {
+            console.error('Sign out error:', error);
+            throw error;
+        }
+    };
+    
+    const resetPassword = async (email) => {
+        try {
+            await auth.sendPasswordResetEmail(email);
+            return true;
+        } catch (error) {
+            console.error('Password reset error:', error);
+            throw error;
+        }
+    };
+    
+    const clearError = () => {
+        setError(null);
+    };
+    
+    const value = {
+        user,
+        loading,
+        isAdmin,
+        error,
+        signIn,
+        signUp,
+        signInWithGoogle,
+        signOut,
+        resetPassword,
+        clearError
+    };
+    
+    return (
+        <AuthContext.Provider value={value}>
+            {children}
+        </AuthContext.Provider>
+    );
+};
 
-// Helper function to check connection
-window.isFirebaseConnected = () => connectionState.isOnline && connectionState.isConnected;
+window.AuthProvider = AuthProvider;
+window.useAuth = () => useContext(AuthContext);
