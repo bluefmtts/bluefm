@@ -4,7 +4,7 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
     const [expandedSummary, setExpandedSummary] = useState(false);
     const [chapters, setChapters] = useState([]);
     const [chaptersLoading, setChaptersLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState('about');
+    const [showChapters, setShowChapters] = useState(false);
     const [novelDetails, setNovelDetails] = useState(novel);
     
     const { 
@@ -32,30 +32,25 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
         }
     };
     
-    // Load chapters when tab changes to chapters
-    const handleTabChange = async (tab) => {
-        setActiveTab(tab);
-        
-        if (tab === 'chapters' && chapters.length === 0 && !chaptersLoading) {
-            setChaptersLoading(true);
-            try {
-                const chaptersList = await getChaptersList(novel.id);
-                setChapters(chaptersList);
-                console.log(`Loaded ${chaptersList.length} chapters for ${novel.title}`);
-            } catch (error) {
-                console.error('Error loading chapters:', error);
-            } finally {
-                setChaptersLoading(false);
-            }
-        }
-    };
-    
-    const handleStartReading = () => {
+    // Load chapters when user clicks "All Chapters" button
+    const handleShowChapters = async () => {
         if (chapters.length > 0) {
-            setSelectedChapter({ novel: novelDetails, chapter: chapters[0] });
-            setCurrentView('reader');
-        } else {
-            handleTabChange('chapters');
+            // Already loaded, just toggle visibility
+            setShowChapters(!showChapters);
+            return;
+        }
+        
+        setChaptersLoading(true);
+        try {
+            const chaptersList = await getChaptersList(novel.id);
+            // Show only first 10 chapters
+            setChapters(chaptersList.slice(0, 10));
+            setShowChapters(true);
+            console.log(`Loaded ${Math.min(chaptersList.length, 10)} chapters for ${novel.title}`);
+        } catch (error) {
+            console.error('Error loading chapters:', error);
+        } finally {
+            setChaptersLoading(false);
         }
     };
     
@@ -75,7 +70,7 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
                 <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 p-6 mb-6 animate-fadeIn">
                     <div className="flex flex-col sm:flex-row gap-6">
                         <img 
-                            src={novelDetails.coverImage || novelDetails.coverUrl || `https://picsum.photos/200/300?random=${novelDetails.id}`}
+                            src={novelDetails.coverImage || novelDetails.coverUrl || `data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjAwIiBoZWlnaHQ9IjMwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjAwIiBoZWlnaHQ9IjMwMCIgZmlsbD0iIzY2NkY4OCIvPjx0ZXh0IHRleHQtYW5jaG9yPSJtaWRkbGUiIHg9IjEwMCIgeT0iMTUwIiBzdHlsZT0iZmlsbDojZmZmO2ZvbnQtc2l6ZToyMHB4O2ZvbnQtZmFtaWx5OkFyaWFsIj5ObyBJbWFnZTwvdGV4dD48L3N2Zz4=`}
                             alt={novelDetails.title}
                             className="w-full sm:w-48 h-72 object-cover rounded-xl shadow-lg"
                             loading="lazy"
@@ -122,74 +117,17 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
                                 )}
                             </div>
                             
-                            <div className="flex gap-3">
-                                <button
-                                    onClick={handleStartReading}
-                                    className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2"
-                                >
-                                    <Icon name="book-open" className="w-5 h-5" />
-                                    Start Reading
-                                </button>
-                                
-                                {user && (
-                                    <button
-                                        onClick={() => toggleBookmark(novel.id)}
-                                        className={`px-4 py-2 rounded-lg border transition-all flex items-center gap-2 ${
-                                            isBookmarked
-                                                ? 'bg-indigo-600 text-white border-indigo-600'
-                                                : 'border-gray-300 dark:border-gray-700 hover:border-indigo-600 dark:hover:border-indigo-400 text-gray-700 dark:text-gray-300'
-                                        }`}
-                                    >
-                                        <Icon name={isBookmarked ? "bookmark-check" : "bookmark"} className="w-5 h-5" />
-                                        {isBookmarked ? 'Bookmarked' : 'Bookmark'}
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                {/* Tabs Section */}
-                <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 animate-slideUp">
-                    {/* Tab Headers */}
-                    <div className="flex border-b border-gray-200 dark:border-gray-800">
-                        <button
-                            onClick={() => handleTabChange('about')}
-                            className={`flex-1 px-6 py-4 font-medium transition-colors ${
-                                activeTab === 'about'
-                                    ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-                            }`}
-                        >
-                            About
-                        </button>
-                        <button
-                            onClick={() => handleTabChange('chapters')}
-                            className={`flex-1 px-6 py-4 font-medium transition-colors ${
-                                activeTab === 'chapters'
-                                    ? 'text-indigo-600 dark:text-indigo-400 border-b-2 border-indigo-600 dark:border-indigo-400'
-                                    : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
-                            }`}
-                        >
-                            Chapters ({novelDetails.totalChapters || chapters.length || 0})
-                        </button>
-                    </div>
-                    
-                    {/* Tab Content */}
-                    <div className="p-6">
-                        {/* About Tab */}
-                        {activeTab === 'about' && (
-                            <div className="animate-fadeIn">
-                                <h3 className="font-semibold mb-3 text-gray-900 dark:text-gray-100">Summary</h3>
-                                <p className={`text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap ${
-                                    !expandedSummary ? 'line-clamp-4' : ''
+                            <div className="mb-4">
+                                <h3 className="font-semibold mb-2 text-gray-900 dark:text-gray-100">Summary</h3>
+                                <p className={`text-gray-600 dark:text-gray-400 leading-relaxed ${
+                                    !expandedSummary ? 'line-clamp-3' : ''
                                 }`}>
-                                    {novelDetails.description || novelDetails.summary || 'No description available.'}
+                                    {novelDetails.summary || novelDetails.description || 'No description available.'}
                                 </p>
-                                {(novelDetails.description || novelDetails.summary) && (novelDetails.description || novelDetails.summary).length > 200 && (
+                                {(novelDetails.summary || novelDetails.description) && (novelDetails.summary || novelDetails.description).length > 150 && (
                                     <button
                                         onClick={() => setExpandedSummary(!expandedSummary)}
-                                        className="text-indigo-600 dark:text-indigo-400 hover:underline text-sm mt-3 flex items-center gap-1"
+                                        className="text-indigo-600 dark:text-indigo-400 hover:underline text-sm mt-2 flex items-center gap-1"
                                     >
                                         <Icon 
                                             name="chevron-down" 
@@ -199,74 +137,120 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
                                     </button>
                                 )}
                             </div>
-                        )}
-                        
-                        {/* Chapters Tab */}
-                        {activeTab === 'chapters' && (
-                            <div className="animate-fadeIn">
-                                {chaptersLoading ? (
-                                    <div className="flex justify-center items-center py-12">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                                        <span className="ml-3 text-gray-600 dark:text-gray-400">Loading chapters...</span>
-                                    </div>
-                                ) : chapters.length > 0 ? (
-                                    <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
-                                        {chapters.map((chapter) => {
-                                            const progressKey = `${novel.id}:${chapter.id}`;
-                                            const progress = readProgress[progressKey] || 0;
-                                            
-                                            return (
-                                                <div
-                                                    key={chapter.id}
-                                                    onClick={() => {
-                                                        setSelectedChapter({ novel: novelDetails, chapter });
-                                                        setCurrentView('reader');
-                                                    }}
-                                                    className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-all group"
-                                                >
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="flex-1">
-                                                            <div className="flex items-center gap-3">
-                                                                <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                                                                    Ch. {chapter.chapterNumber || chapter.number}
-                                                                </span>
-                                                                <h3 className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                                                                    {chapter.title}
-                                                                </h3>
-                                                            </div>
-                                                            <div className="flex items-center gap-4 mt-1">
-                                                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                                    {chapter.readTime || '10 min'}
-                                                                </p>
-                                                                {progress > 0 && (
-                                                                    <div className="flex items-center gap-2">
-                                                                        <div className="w-24 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
-                                                                            <div 
-                                                                                className="h-full bg-indigo-600"
-                                                                                style={{ width: `${progress * 100}%` }}
-                                                                            />
-                                                                        </div>
-                                                                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                                                                            {Math.round(progress * 100)}%
-                                                                        </span>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <Icon name="chevron-right" className="w-5 h-5 text-gray-400 dark:text-gray-600 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                ) : (
-                                    <p className="text-center text-gray-500 dark:text-gray-400 py-8">
-                                        No chapters available yet
-                                    </p>
-                                )}
-                            </div>
-                        )}
+                            
+                            {user && (
+                                <button
+                                    onClick={() => toggleBookmark(novel.id)}
+                                    className={`px-4 py-2 rounded-lg border transition-all flex items-center gap-2 ${
+                                        isBookmarked
+                                            ? 'bg-indigo-600 text-white border-indigo-600'
+                                            : 'border-gray-300 dark:border-gray-700 hover:border-indigo-600 dark:hover:border-indigo-400 text-gray-700 dark:text-gray-300'
+                                    }`}
+                                >
+                                    <Icon name={isBookmarked ? "bookmark-check" : "bookmark"} className="w-5 h-5" />
+                                    {isBookmarked ? 'Bookmarked' : 'Add to Bookmarks'}
+                                </button>
+                            )}
+                        </div>
                     </div>
+                </div>
+                
+                {/* Chapters Section */}
+                <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 p-6 animate-slideUp">
+                    {/* All Chapters Button */}
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">
+                            Chapters
+                        </h2>
+                        <button
+                            onClick={handleShowChapters}
+                            disabled={chaptersLoading}
+                            className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+                        >
+                            {chaptersLoading ? (
+                                <>
+                                    <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                                    Loading...
+                                </>
+                            ) : (
+                                <>
+                                    <Icon name={showChapters ? "chevron-up" : "list"} className="w-4 h-4" />
+                                    {showChapters ? 'Hide Chapters' : 'All Chapters'}
+                                </>
+                            )}
+                        </button>
+                    </div>
+                    
+                    {/* Chapters List - Only show when clicked */}
+                    {showChapters && chapters.length > 0 && (
+                        <div className="space-y-2 max-h-96 overflow-y-auto pr-2 animate-fadeIn">
+                            {chapters.map((chapter) => {
+                                const progressKey = `${novel.id}:${chapter.id}`;
+                                const progress = readProgress[progressKey] || 0;
+                                
+                                return (
+                                    <div
+                                        key={chapter.id}
+                                        onClick={() => {
+                                            // Only pass chapter ID and basic info, not content
+                                            setSelectedChapter({ 
+                                                novel: novelDetails, 
+                                                chapter: {
+                                                    id: chapter.id,
+                                                    number: chapter.number,
+                                                    chapterNumber: chapter.chapterNumber,
+                                                    title: chapter.title
+                                                }
+                                            });
+                                            setCurrentView('reader');
+                                        }}
+                                        className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-all group"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex-1">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
+                                                        Ch. {chapter.chapterNumber || chapter.number}
+                                                    </span>
+                                                    <h3 className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                                        {chapter.title}
+                                                    </h3>
+                                                </div>
+                                                {progress > 0 && (
+                                                    <div className="flex items-center gap-2 mt-1">
+                                                        <div className="w-24 h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                                                            <div 
+                                                                className="h-full bg-indigo-600"
+                                                                style={{ width: `${progress * 100}%` }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                            {Math.round(progress * 100)}%
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <Icon name="chevron-right" className="w-5 h-5 text-gray-400 dark:text-gray-600 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors" />
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                            
+                            {/* Show more message if there are more chapters */}
+                            {novelDetails.totalChapters > 10 && (
+                                <p className="text-center text-sm text-gray-500 dark:text-gray-400 py-2">
+                                    Showing first 10 chapters of {novelDetails.totalChapters}
+                                </p>
+                            )}
+                        </div>
+                    )}
+                    
+                    {/* Empty state when chapters button not clicked */}
+                    {!showChapters && (
+                        <p className="text-center text-gray-500 dark:text-gray-400 py-8">
+                            Click "All Chapters" to view chapter list
+                        </p>
+                    )}
                 </div>
             </div>
         </div>
