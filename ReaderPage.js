@@ -1,40 +1,142 @@
 const { useState, useEffect, useRef, useContext } = React;
 
 const ReaderPage = ({ chapterData, setCurrentView }) => {
-    const { novel, chapter } = chapterData;
+    const { novel, chapter: initialChapter } = chapterData;
+    const [currentChapter, setCurrentChapter] = useState(null);
+    const [chaptersList, setChaptersList] = useState([]);
+    const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
+    const [loading, setLoading] = useState(true);
+    const [navigating, setNavigating] = useState(false);
+    
     const [fontSize, setFontSize] = useState(() => {
         const saved = localStorage.getItem('readerFontSize');
         return saved ? parseInt(saved) : 16;
     });
-    const { addToHistory, updateReadProgress } = useContext(DataContext);
+    
+    const { 
+        addToHistory, 
+        updateReadProgress, 
+        getChaptersList, 
+        getChapterContent 
+    } = useContext(DataContext);
     const { isDark, toggleTheme } = useContext(ThemeContext);
     const contentRef = useRef(null);
-    const [currentChapterIndex, setCurrentChapterIndex] = useState(
-        novel.chapters.findIndex(ch => ch.id === chapter.id)
-    );
+    const scrollPositionRef = useRef(0);
     
+    // Initial load - get chapters list and current chapter content
     useEffect(() => {
-        addToHistory(novel.id, chapter.id);
-    }, [novel.id, chapter.id]);
+        initializeReader();
+    }, [novel.id, initialChapter.id]);
     
+    const initializeReader = async () => {
+        setLoading(true);
+        try {
+            // First get chapters list (without content)
+            const chapters = await getChaptersList(novel.id);
+            setChaptersList(chapters);
+            
+            // Find current chapter index
+            const index = chapters.findIndex(ch => ch.id === initialChapter.id);
+            setCurrentChapterIndex(index >= 0 ? index : 0);
+            
+            // Load ONLY current chapter content
+            const chapterContent = await getChapterContent(novel.id, initialChapter.id);
+            if (chapterContent) {
+                setCurrentChapter(chapterContent);
+                addToHistory(novel.id, initialChapter.id, chapterContent.title);
+            }
+        } catch (error) {
+            console.error('Error initializing reader:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    // Save font size
     useEffect(() => {
         localStorage.setItem('readerFontSize', fontSize.toString());
     }, [fontSize]);
     
-    const currentChapter = novel.chapters[currentChapterIndex];
-    const hasPrev = currentChapterIndex > 0;
-    const hasNext = currentChapterIndex < novel.chapters.length - 1;
-    
-    const navigateChapter = (direction) => {
-        const newIndex = currentChapterIndex + direction;
-        if (newIndex >= 0 && newIndex < novel.chapters.length) {
-            setCurrentChapterIndex(newIndex);
-            if (contentRef.current) {
-                contentRef.current.scrollTop = 0;
+    // Track reading progress
+    useEffect(() => {
+        if (!currentChapter || !contentRef.current) return;
+        
+        const handleScroll = () => {
+            const element = contentRef.current;
+            const scrollProgress = element.scrollTop / (element.scrollHeight - element.clientHeight);
+            scrollPositionRef.current = scrollProgress;
+            
+            // Update progress every 10% scroll
+            if (scrollProgress > 0) {
+                updateReadProgress(novel.id, currentChapter.id, scrollProgress);
             }
-            addToHistory(novel.id, novel.chapters[newIndex].id);
+        };
+        
+        const element = contentRef.current;
+        element.addEventListener('scroll', handleScroll);
+        return () => element.removeEventListener('scroll', handleScroll);
+    }, [currentChapter, novel.id]);
+    
+    // Navigate to different chapter
+    const navigateChapter = async (direction) => {
+        const newIndex = currentChapterIndex + direction;
+        
+        if (newIndex < 0 || newIndex >= chaptersList.length) return;
+        
+        setNavigating(true);
+        try {
+            const targetChapter = chaptersList[newIndex];
+            
+            // Load new chapter content
+            const chapterContent = await getChapterContent(novel.id, targetChapter.id);
+            
+            if (chapterContent) {
+                setCurrentChapter(chapterContent);
+                setCurrentChapterIndex(newIndex);
+                addToHistory(novel.id, targetChapter.id, chapterContent.title);
+                
+                // Scroll to top
+                if (contentRef.current) {
+                    contentRef.current.scrollTop = 0;
+                }
+            }
+        } catch (error) {
+            console.error('Error navigating chapter:', error);
+        } finally {
+            setNavigating(false);
         }
     };
+    
+    const hasPrev = currentChapterIndex > 0;
+    const hasNext = currentChapterIndex < chaptersList.length - 1;
+    
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-950">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                    <p className="text-gray-600 dark:text-gray-400">Loading chapter...</p>
+                </div>
+            </div>
+        );
+    }
+    
+    if (!currentChapter) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-950">
+                <div className="text-center">
+                    <Icon name="book-x" className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">Chapter not found</p>
+                    <button
+                        onClick={() => setCurrentView('detail')}
+                        className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                    >
+                        Back to novel
+                    </button>
+                </div>
+            </div>
+        );
+    }
     
     return (
         <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors">
@@ -95,21 +197,39 @@ const ReaderPage = ({ chapterData, setCurrentView }) => {
                 className="max-w-3xl mx-auto px-4 py-8 overflow-y-auto"
                 style={{ maxHeight: 'calc(100vh - 200px)' }}
             >
-                <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">
-                    {currentChapter.title}
-                </h1>
-                
-                <div 
-                    className="prose dark:prose-invert max-w-none text-gray-800 dark:text-gray-200 protected-content"
-                    style={{ 
-                        fontSize: `${fontSize}px`,
-                        lineHeight: '1.8'
-                    }}
-                >
-                    <div className="whitespace-pre-wrap">
-                        {currentChapter.content}
+                {navigating ? (
+                    <div className="flex items-center justify-center py-20">
+                        <div className="text-center">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto mb-4"></div>
+                            <p className="text-gray-600 dark:text-gray-400">Loading chapter...</p>
+                        </div>
                     </div>
-                </div>
+                ) : (
+                    <>
+                        <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">
+                            Chapter {currentChapter.chapterNumber || currentChapterIndex + 1}: {currentChapter.title}
+                        </h1>
+                        
+                        <div 
+                            className="prose dark:prose-invert max-w-none text-gray-800 dark:text-gray-200 protected-content animate-fadeIn"
+                            style={{ 
+                                fontSize: `${fontSize}px`,
+                                lineHeight: '1.8'
+                            }}
+                        >
+                            <div className="whitespace-pre-wrap">
+                                {currentChapter.content || 'No content available for this chapter.'}
+                            </div>
+                        </div>
+                        
+                        {/* Chapter End */}
+                        <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800">
+                            <p className="text-center text-gray-500 dark:text-gray-400 mb-4">
+                                End of Chapter {currentChapter.chapterNumber || currentChapterIndex + 1}
+                            </p>
+                        </div>
+                    </>
+                )}
             </div>
             
             {/* Navigation */}
@@ -118,9 +238,9 @@ const ReaderPage = ({ chapterData, setCurrentView }) => {
                     <div className="flex items-center justify-between">
                         <button
                             onClick={() => navigateChapter(-1)}
-                            disabled={!hasPrev}
+                            disabled={!hasPrev || navigating}
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                                hasPrev
+                                hasPrev && !navigating
                                     ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                                     : 'bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
                             }`}
@@ -130,14 +250,14 @@ const ReaderPage = ({ chapterData, setCurrentView }) => {
                         </button>
                         
                         <span className="text-sm text-gray-500 dark:text-gray-400">
-                            Chapter {currentChapter.number} of {novel.chapters.length}
+                            Chapter {currentChapterIndex + 1} of {chaptersList.length}
                         </span>
                         
                         <button
                             onClick={() => navigateChapter(1)}
-                            disabled={!hasNext}
+                            disabled={!hasNext || navigating}
                             className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all ${
-                                hasNext
+                                hasNext && !navigating
                                     ? 'bg-indigo-600 text-white hover:bg-indigo-700'
                                     : 'bg-gray-200 dark:bg-gray-800 text-gray-400 cursor-not-allowed'
                             }`}
