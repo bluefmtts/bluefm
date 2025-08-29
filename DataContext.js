@@ -8,8 +8,17 @@ const DataProvider = ({ children }) => {
     const [readingHistory, setReadingHistory] = useState([]);
     const [readProgress, setReadProgress] = useState({});
     const [loading, setLoading] = useState(true);
+    const [loadingMore, setLoadingMore] = useState(false);
     const [demoDataLoaded, setDemoDataLoaded] = useState(false);
     const { user } = useContext(AuthContext);
+    
+    // Pagination states
+    const [lastVisible, setLastVisible] = useState(null);
+    const [hasMore, setHasMore] = useState(true);
+    const [cachedNovels, setCachedNovels] = useState(new Map());
+    const [cachedChapters, setCachedChapters] = useState(new Map());
+    
+    const NOVELS_PER_PAGE = 6; // Load only 6 novels at a time
     
     // Load demo data if database is empty
     const loadDemoData = async () => {
@@ -20,61 +29,294 @@ const DataProvider = ({ children }) => {
             
             if (snapshot.empty) {
                 console.log('Loading demo novels...');
-                // Add demo novels to Firebase
-                for (const novel of DEMO_NOVELS) {
+                // Add only first few demo novels, not all
+                for (const novel of DEMO_NOVELS.slice(0, 3)) {
+                    // Remove chapters from initial load
+                    const { chapters, ...novelData } = novel;
                     await db.collection('novels').add({
-                        ...novel,
+                        ...novelData,
+                        totalChapters: chapters ? chapters.length : 0,
                         createdAt: firebase.firestore.FieldValue.serverTimestamp(),
                         updatedAt: firebase.firestore.FieldValue.serverTimestamp()
                     });
+                    
+                    // Store chapters separately (not loaded initially)
+                    if (chapters && chapters.length > 0) {
+                        const novelDoc = await db.collection('novels').add(novelData);
+                        for (const chapter of chapters) {
+                            await db.collection('novels')
+                                .doc(novelDoc.id)
+                                .collection('chapters')
+                                .add(chapter);
+                        }
+                    }
                 }
                 console.log('Demo novels loaded successfully!');
             }
             setDemoDataLoaded(true);
         } catch (error) {
             console.error('Error loading demo data:', error);
-            // If Firebase fails, use local demo data
-            setNovels(DEMO_NOVELS.map((novel, index) => ({
+            // If Firebase fails, use minimal local demo data
+            setNovels(DEMO_NOVELS.slice(0, 3).map((novel, index) => ({
                 ...novel,
-                id: `demo-${index}`
+                id: `demo-${index}`,
+                chapters: undefined // Don't include chapters initially
             })));
             setLoading(false);
         }
     };
     
-    // Fetch novels from Firebase
-    useEffect(() => {
-        loadDemoData();
+    // Initial load - fetch only first batch of novels WITHOUT chapters
+    const loadInitialNovels = async () => {
+        try {
+            setLoading(true);
+            await loadDemoData();
+            
+            const query = db.collection('novels')
+                .where('published', '==', true)
+                .orderBy('createdAt', 'desc')
+                .limit(NOVELS_PER_PAGE);
+                
+            const snapshot = await query.get();
+            
+            if (!snapshot.empty) {
+                const novelsData = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    // Only get basic info, NO chapters
+                    novelsData.push({
+                        id: doc.id,
+                        title: data.title,
+                        author: data.author,
+                        coverImage: data.coverImage,
+                        genre: data.genre,
+                        description: data.description ? 
+                            (data.description.substring(0, 200) + '...') : '',
+                        rating: data.rating || 0,
+                        views: data.views || 0,
+                        bookmarkCount: data.bookmarkCount || 0,
+                        totalChapters: data.totalChapters || 0,
+                        isPremium: data.isPremium || false,
+                        published: data.published
+                    });
+                });
+                
+                setNovels(novelsData);
+                setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+                setHasMore(snapshot.docs.length === NOVELS_PER_PAGE);
+            }
+        } catch (error) {
+            console.error('Error fetching novels:', error);
+            // Fallback to minimal demo data
+            setNovels(DEMO_NOVELS.slice(0, 3).map((novel, index) => ({
+                ...novel,
+                id: `demo-${index}`,
+                chapters: undefined
+            })));
+        } finally {
+            setLoading(false);
+        }
+    };
+    
+    // Load more novels when scrolling (pagination)
+    const loadMoreNovels = async () => {
+        if (!hasMore || loadingMore || !lastVisible) return;
         
-        const unsubscribe = db.collection('novels')
-            .where('published', '==', true)
-            .orderBy('createdAt', 'desc')
-            .onSnapshot(snapshot => {
-                const novelsData = snapshot.docs.map(doc => ({
+        try {
+            setLoadingMore(true);
+            
+            const query = db.collection('novels')
+                .where('published', '==', true)
+                .orderBy('createdAt', 'desc')
+                .startAfter(lastVisible)
+                .limit(NOVELS_PER_PAGE);
+                
+            const snapshot = await query.get();
+            
+            if (!snapshot.empty) {
+                const novelsData = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    novelsData.push({
+                        id: doc.id,
+                        title: data.title,
+                        author: data.author,
+                        coverImage: data.coverImage,
+                        genre: data.genre,
+                        description: data.description ? 
+                            (data.description.substring(0, 200) + '...') : '',
+                        rating: data.rating || 0,
+                        views: data.views || 0,
+                        bookmarkCount: data.bookmarkCount || 0,
+                        totalChapters: data.totalChapters || 0,
+                        isPremium: data.isPremium || false,
+                        published: data.published
+                    });
+                });
+                
+                setNovels(prev => [...prev, ...novelsData]);
+                setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
+                setHasMore(snapshot.docs.length === NOVELS_PER_PAGE);
+            } else {
+                setHasMore(false);
+            }
+        } catch (error) {
+            console.error('Error loading more novels:', error);
+        } finally {
+            setLoadingMore(false);
+        }
+    };
+    
+    // Get single novel with full details (load on demand)
+    const getNovelDetails = async (novelId) => {
+        // Check cache first
+        if (cachedNovels.has(novelId)) {
+            return cachedNovels.get(novelId);
+        }
+        
+        try {
+            const doc = await db.collection('novels').doc(novelId).get();
+            if (doc.exists) {
+                const novelData = {
                     id: doc.id,
                     ...doc.data()
-                }));
-                setNovels(novelsData);
-                setLoading(false);
-            }, error => {
-                console.error('Error fetching novels:', error);
-                // Fallback to demo data
-                setNovels(DEMO_NOVELS.map((novel, index) => ({
-                    ...novel,
-                    id: `demo-${index}`
-                })));
-                setLoading(false);
+                };
+                // Cache it
+                setCachedNovels(prev => new Map(prev).set(novelId, novelData));
+                return novelData;
+            }
+        } catch (error) {
+            console.error('Error getting novel details:', error);
+        }
+        return null;
+    };
+    
+    // Get chapters list WITHOUT content (for chapter selection)
+    const getChaptersList = async (novelId) => {
+        try {
+            const snapshot = await db.collection('novels')
+                .doc(novelId)
+                .collection('chapters')
+                .orderBy('chapterNumber', 'asc')
+                .get();
+                
+            const chapters = [];
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                chapters.push({
+                    id: doc.id,
+                    chapterNumber: data.chapterNumber,
+                    title: data.title,
+                    isPremium: data.isPremium || false,
+                    isLocked: data.isLocked || false
+                    // NO content here
+                });
             });
+            
+            return chapters;
+        } catch (error) {
+            console.error('Error getting chapters list:', error);
+            // Try from demo data if it's a demo novel
+            if (novelId.startsWith('demo-')) {
+                const demoNovel = DEMO_NOVELS.find(n => n.id === novelId);
+                if (demoNovel && demoNovel.chapters) {
+                    return demoNovel.chapters.map(ch => ({
+                        id: ch.id,
+                        chapterNumber: ch.chapterNumber,
+                        title: ch.title,
+                        isPremium: ch.isPremium || false
+                    }));
+                }
+            }
+            return [];
+        }
+    };
+    
+    // Get single chapter content (load only when reading)
+    const getChapterContent = async (novelId, chapterId) => {
+        const cacheKey = `${novelId}_${chapterId}`;
         
-        return unsubscribe;
+        // Check cache first
+        if (cachedChapters.has(cacheKey)) {
+            return cachedChapters.get(cacheKey);
+        }
+        
+        try {
+            const doc = await db.collection('novels')
+                .doc(novelId)
+                .collection('chapters')
+                .doc(chapterId)
+                .get();
+                
+            if (doc.exists) {
+                const chapterData = {
+                    id: doc.id,
+                    ...doc.data()
+                };
+                // Cache it (limit cache size)
+                if (cachedChapters.size > 20) {
+                    // Remove oldest entries
+                    const firstKey = cachedChapters.keys().next().value;
+                    cachedChapters.delete(firstKey);
+                }
+                setCachedChapters(prev => new Map(prev).set(cacheKey, chapterData));
+                return chapterData;
+            }
+        } catch (error) {
+            console.error('Error getting chapter content:', error);
+            // Try demo data
+            if (novelId.startsWith('demo-')) {
+                const demoNovel = DEMO_NOVELS.find(n => n.id === novelId);
+                const chapter = demoNovel?.chapters?.find(ch => ch.id === chapterId);
+                if (chapter) return chapter;
+            }
+        }
+        return null;
+    };
+    
+    // Search novels (limited results)
+    const searchNovels = async (searchTerm) => {
+        if (!searchTerm || searchTerm.length < 2) return [];
+        
+        try {
+            const query = db.collection('novels')
+                .where('published', '==', true)
+                .orderBy('title')
+                .startAt(searchTerm)
+                .endAt(searchTerm + '\uf8ff')
+                .limit(10); // Limit search results
+                
+            const snapshot = await query.get();
+            const results = [];
+            
+            snapshot.forEach(doc => {
+                const data = doc.data();
+                results.push({
+                    id: doc.id,
+                    title: data.title,
+                    author: data.author,
+                    coverImage: data.coverImage,
+                    genre: data.genre
+                });
+            });
+            
+            return results;
+        } catch (error) {
+            console.error('Error searching novels:', error);
+            return [];
+        }
+    };
+    
+    // Initial load
+    useEffect(() => {
+        loadInitialNovels();
     }, []);
     
-    // Load user data
+    // Load user data (unchanged)
     useEffect(() => {
         if (user) {
             loadUserData();
         } else {
-            // Load from localStorage for non-logged in users
             const savedBookmarks = localStorage.getItem('bookmarks');
             const savedHistory = localStorage.getItem('readingHistory');
             const savedProgress = localStorage.getItem('readProgress');
@@ -102,7 +344,6 @@ const DataProvider = ({ children }) => {
     
     const saveUserData = async () => {
         if (!user) {
-            // Save to localStorage for non-logged in users
             localStorage.setItem('bookmarks', JSON.stringify(bookmarks));
             localStorage.setItem('readingHistory', JSON.stringify(readingHistory));
             localStorage.setItem('readProgress', JSON.stringify(readProgress));
@@ -121,7 +362,6 @@ const DataProvider = ({ children }) => {
         }
     };
     
-    // Save user data when it changes
     useEffect(() => {
         const timer = setTimeout(saveUserData, 1000);
         return () => clearTimeout(timer);
@@ -136,7 +376,6 @@ const DataProvider = ({ children }) => {
             }
         });
         
-        // Update novel bookmark count if not demo data
         if (!novelId.startsWith('demo-')) {
             try {
                 const novelRef = db.collection('novels').doc(novelId);
@@ -150,22 +389,16 @@ const DataProvider = ({ children }) => {
         }
     };
     
-    const addToHistory = (novelId, chapterId) => {
-        const novel = novels.find(n => n.id === novelId);
-        const chapter = novel?.chapters?.find(c => c.id === chapterId);
-        
-        if (novel && chapter) {
-            setReadingHistory(prev => {
-                const filtered = prev.filter(h => !(h.novelId === novelId && h.chapterId === chapterId));
-                return [{
-                    novelId,
-                    chapterId,
-                    novelTitle: novel.title,
-                    chapterTitle: chapter.title,
-                    timestamp: Date.now()
-                }, ...filtered].slice(0, 50);
-            });
-        }
+    const addToHistory = (novelId, chapterId, chapterTitle) => {
+        setReadingHistory(prev => {
+            const filtered = prev.filter(h => !(h.novelId === novelId && h.chapterId === chapterId));
+            return [{
+                novelId,
+                chapterId,
+                chapterTitle,
+                timestamp: Date.now()
+            }, ...filtered].slice(0, 50);
+        });
     };
     
     const updateReadProgress = (novelId, chapterId, progress) => {
@@ -194,10 +427,17 @@ const DataProvider = ({ children }) => {
             readingHistory,
             readProgress,
             loading,
+            loadingMore,
+            hasMore,
             toggleBookmark,
             addToHistory,
             updateReadProgress,
-            incrementViewCount
+            incrementViewCount,
+            loadMoreNovels,
+            getNovelDetails,
+            getChaptersList,
+            getChapterContent,
+            searchNovels
         }}>
             {children}
         </DataContext.Provider>
