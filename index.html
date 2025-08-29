@@ -6,31 +6,18 @@
     <title>BlueFM Novel - Modern Novel Reading Platform</title>
     
     <!-- SEO & Social -->
-    <meta name="description" content="BlueFM Novel - Modern Novel Reading Platform. Read amazing novels online with beautiful interface. Premium membership for just ₹9/year.">
-    <meta name="keywords" content="novels, reading, books, stories, online reading, BlueFM Novel, premium novels">
+    <meta name="description" content="BlueFM Novel - Modern Novel Reading Platform. Read amazing novels online with beautiful interface.">
+    <meta name="keywords" content="novels, reading, books, stories, online reading, BlueFM Novel">
     <meta property="og:title" content="BlueFM Novel - Modern Novel Reading Platform">
-    <meta property="og:description" content="Read amazing novels online with beautiful interface. Premium membership for just ₹9/year.">
+    <meta property="og:description" content="Read amazing novels online with beautiful interface.">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
     
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
     
-    <!-- External Libraries -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    
-    <!-- Firebase -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
-    
-    <!-- Razorpay -->
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     
     <!-- Tailwind Config -->
     <script>
@@ -49,71 +36,234 @@
     </script>
     
     <!-- Custom Styles -->
-    <link rel="stylesheet" href="custom.css">
+    <style>
+        /* Animation Keyframes */
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        @keyframes slideIn {
+            from { 
+                opacity: 0; 
+                transform: translateX(-20px);
+            }
+            to { 
+                opacity: 1;
+                transform: translateX(0);
+            }
+        }
+        
+        @keyframes slideUp {
+            from { 
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to { 
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        /* Utility Classes */
+        .hover-lift {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+        
+        .hover-lift:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+        }
+        
+        .animate-fadeIn {
+            animation: fadeIn 0.5s ease-out;
+        }
+        
+        .animate-slideIn {
+            animation: slideIn 0.4s ease-out;
+        }
+        
+        .animate-slideUp {
+            animation: slideUp 0.3s ease-out;
+        }
+        
+        /* Text Clamp */
+        .line-clamp-1 {
+            display: -webkit-box;
+            -webkit-line-clamp: 1;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .line-clamp-3 {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        .line-clamp-4 {
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        
+        /* Scrollbar */
+        .no-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        
+        .no-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        
+        /* Content Protection */
+        .protected-content {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        
+        /* Custom Scrollbar */
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #f1f1f1;
+            border-radius: 10px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #888;
+            border-radius: 10px;
+        }
+        
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #555;
+        }
+        
+        /* Dark mode scrollbar */
+        .dark .custom-scrollbar::-webkit-scrollbar-track {
+            background: #1f2937;
+        }
+        
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #4b5563;
+        }
+        
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #6b7280;
+        }
+    </style>
 </head>
 <body>
     <div id="root"></div>
     
-    <!-- Load all JavaScript files in correct order -->
+    <!-- React (Use React 17 for better compatibility) -->
+    <script crossorigin src="https://unpkg.com/react@17/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@17/umd/react-dom.production.min.js"></script>
+    
+    <!-- Firebase (Use version 8 for simpler API) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-auth.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-storage.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+    
+    <!-- Razorpay -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    
+    <!-- Load all JavaScript files WITHOUT Babel (Pure JS) -->
     
     <!-- Core Configuration -->
-    <script type="text/babel" src="firebase.js"></script>
-    <script type="text/babel" src="demoNovels.js"></script>
-    
-    <!-- Contexts -->
-    <script type="text/babel" src="ThemeContext.js"></script>
-    <script type="text/babel" src="AuthContext.js"></script>
-    <script type="text/babel" src="DataContext.js"></script>
-    <script type="text/babel" src="MembershipContext.js"></script>
-    
-    <!-- Protection Components -->
-    <script type="text/babel" src="ContentProtection.js"></script>
-    <script type="text/babel" src="AdvancedProtection.js"></script>
+    <script src="firebase.js"></script>
+    <!-- Remove demoNovels.js as it's not needed -->
     
     <!-- Common Components -->
-    <script type="text/babel" src="Icon.js"></script>
-    <script type="text/babel" src="LoadingSpinner.js"></script>
-    <script type="text/babel" src="LoadingSkeleton.js"></script>
-    <script type="text/babel" src="MembershipGate.js"></script>
+    <script src="Icon.js"></script>
+    <script src="LoadingSpinner.js"></script>
+    <script src="LoadingSkeleton.js"></script>
     
-    <!-- Layout Components -->
-    <script type="text/babel" src="Header.js"></script>
-    <script type="text/babel" src="Footer.js"></script>
+    <!-- Contexts (Order matters!) -->
+    <script src="ThemeContext.js"></script>
+    <script src="AuthContext.js"></script>
+    <script src="DataContext.js"></script>
+    <script src="MembershipContext.js"></script>
+    
+    <!-- Protection Components -->
+    <script src="ContentProtection.js"></script>
+    <script src="AdvancedProtection.js"></script>
+    <script src="MembershipGate.js"></script>
     
     <!-- Novel Components -->
-    <script type="text/babel" src="NovelCard.js"></script>
-    <script type="text/babel" src="NovelDetailPage.js"></script>
+    <script src="NovelCard.js"></script>
+    
+    <!-- Layout Components -->
+    <script src="Header.js"></script>
+    <script src="Footer.js"></script>
     
     <!-- Page Components -->
-    <script type="text/babel" src="HomePage.js"></script>
-    <script type="text/babel" src="ReaderPage.js"></script>
-    <script type="text/babel" src="LibraryPage.js"></script>
-    <script type="text/babel" src="ProfilePage.js"></script>
-    <script type="text/babel" src="LoginPage.js"></script>
-    <script type="text/babel" src="AdminPanel.js"></script>
+    <script src="HomePage.js"></script>
+    <script src="NovelDetailPage.js"></script>
+    <script src="ReaderPage.js"></script>
+    <script src="LibraryPage.js"></script>
+    <script src="ProfilePage.js"></script>
+    <script src="LoginPage.js"></script>
+    <script src="AdminPanel.js"></script>
     
     <!-- Legal Pages -->
-    <script type="text/babel" src="TermsPage.js"></script>
-    <script type="text/babel" src="PrivacyPage.js"></script>
-    <script type="text/babel" src="RefundPage.js"></script>
-    <script type="text/babel" src="ContactPage.js"></script>
+    <script src="TermsPage.js"></script>
+    <script src="PrivacyPage.js"></script>
+    <script src="RefundPage.js"></script>
+    <script src="ContactPage.js"></script>
     
-    <!-- Main App -->
-    <script type="text/babel" src="App.js"></script>
+    <!-- Main App (Load Last) -->
+    <script src="App.js"></script>
     
-    <!-- Simple Protection Script -->
+    <!-- Protection Script -->
     <script>
-        // Basic console message
-        console.log('%c📚 BlueFM Novel', 'color: #4F46E5; font-size: 16px; font-weight: bold;');
-        console.log('%cContent is protected by copyright.', 'color: #6B7280; font-size: 12px;');
+        // Console styling
+        console.log('%c📚 BlueFM Novel', 'color: #4F46E5; font-size: 20px; font-weight: bold;');
+        console.log('%cContent is protected by copyright.', 'color: #6B7280; font-size: 14px;');
+        console.log('%c⚠️ Warning!', 'color: #EF4444; font-size: 16px; font-weight: bold;');
+        console.log('%cThis is a browser feature intended for developers. Do not paste any code here!', 'color: #6B7280; font-size: 12px;');
         
-        // Only disable right-click on images
+        // Disable right-click on images only
         document.addEventListener('DOMContentLoaded', function() {
             document.addEventListener('contextmenu', function(e) {
                 if (e.target.tagName === 'IMG') {
                     e.preventDefault();
+                    return false;
                 }
             });
+            
+            // Disable image dragging
+            document.addEventListener('dragstart', function(e) {
+                if (e.target.tagName === 'IMG') {
+                    e.preventDefault();
+                    return false;
+                }
+            });
+        });
+        
+        // Handle errors gracefully
+        window.addEventListener('error', function(e) {
+            console.error('Global error:', e.error);
+        });
+        
+        window.addEventListener('unhandledrejection', function(e) {
+            console.error('Unhandled promise rejection:', e.reason);
         });
     </script>
 </body>
