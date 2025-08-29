@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NovelHub - Modern Novel Reading Platform</title>
+    <title>BlueFM Novel - Modern Novel Reading Platform</title>
     
-    <!-- SEO & Social (Keep these) -->
-    <meta name="description" content="NovelHub - Modern Novel Reading Platform. Read amazing novels online with beautiful interface.">
-    <meta name="keywords" content="novels, reading, books, stories, online reading">
-    <meta property="og:title" content="NovelHub - Modern Novel Reading Platform">
-    <meta property="og:description" content="Read amazing novels online with beautiful interface">
+    <!-- SEO & Social -->
+    <meta name="description" content="BlueFM Novel - Modern Novel Reading Platform. Read amazing novels online with beautiful interface. Premium membership for just ₹9/year.">
+    <meta name="keywords" content="novels, reading, books, stories, online reading, BlueFM Novel, premium novels">
+    <meta property="og:title" content="BlueFM Novel - Modern Novel Reading Platform">
+    <meta property="og:description" content="Read amazing novels online with beautiful interface. Premium membership for just ₹9/year.">
     <meta property="og:type" content="website">
     <meta name="twitter:card" content="summary_large_image">
     
@@ -29,40 +29,92 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-storage-compat.js"></script>
     
+    <!-- Razorpay -->
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    
     <!-- Tailwind Config -->
     <script>
-        tailwind.config = {
+        tailwind.config = { 
             darkMode: 'class',
-            theme: { extend: {} }
+            theme: {
+                extend: {
+                    animation: {
+                        'fadeIn': 'fadeIn 0.5s ease-out',
+                        'slideIn': 'slideIn 0.4s ease-out',
+                        'slideUp': 'slideUp 0.3s ease-out'
+                    }
+                }
+            }
         }
     </script>
     
     <!-- Custom Styles -->
-    <link rel="stylesheet" href="src/styles/custom.css">
+    <link rel="stylesheet" href="custom.css">
 </head>
 <body>
     <div id="root"></div>
     
-    <!-- Load all JavaScript files in order -->
-    <script type="text/babel" src="src/config/firebase.js"></script>
-    <script type="text/babel" src="src/data/demoNovels.js"></script>
-    <script type="text/babel" src="src/contexts/ThemeContext.js"></script>
-    <script type="text/babel" src="src/contexts/AuthContext.js"></script>
-    <script type="text/babel" src="src/contexts/DataContext.js"></script>
-    <script type="text/babel" src="src/components/common/Icon.js"></script>
-    <script type="text/babel" src="src/components/common/LoadingSpinner.js"></script>
-    <script type="text/babel" src="src/components/common/LoadingSkeleton.js"></script>
-    <script type="text/babel" src="src/components/common/Header.js"></script>
-    <script type="text/babel" src="src/components/novel/NovelCard.js"></script>
-    <script type="text/babel" src="src/components/novel/NovelDetailPage.js"></script>
-    <script type="text/babel" src="src/components/pages/HomePage.js"></script>
-    <script type="text/babel" src="src/components/pages/ReaderPage.js"></script>
-    <script type="text/babel" src="src/components/pages/LibraryPage.js"></script>
-    <script type="text/babel" src="src/components/pages/ProfilePage.js"></script>
-    <script type="text/babel" src="src/components/pages/LoginPage.js"></script>
-    <script type="text/babel" src="src/components/pages/AdminPanel.js"></script>
-    <script type="text/babel" src="src/components/App.js"></script>
+    <!-- Load all JavaScript files in correct order -->
+    
+    <!-- Core Configuration -->
+    <script type="text/babel" src="firebase.js"></script>
+    <script type="text/babel" src="demoNovels.js"></script>
+    
+    <!-- Contexts -->
+    <script type="text/babel" src="ThemeContext.js"></script>
+    <script type="text/babel" src="AuthContext.js"></script>
+    <script type="text/babel" src="DataContext.js"></script>
+    <script type="text/babel" src="MembershipContext.js"></script>
+    
+    <!-- Protection Components -->
+    <script type="text/babel" src="ContentProtection.js"></script>
+    <script type="text/babel" src="AdvancedProtection.js"></script>
+    
+    <!-- Common Components -->
+    <script type="text/babel" src="Icon.js"></script>
+    <script type="text/babel" src="LoadingSpinner.js"></script>
+    <script type="text/babel" src="LoadingSkeleton.js"></script>
+    <script type="text/babel" src="MembershipGate.js"></script>
+    
+    <!-- Layout Components -->
+    <script type="text/babel" src="Header.js"></script>
+    <script type="text/babel" src="Footer.js"></script>
+    
+    <!-- Novel Components -->
+    <script type="text/babel" src="NovelCard.js"></script>
+    <script type="text/babel" src="NovelDetailPage.js"></script>
+    
+    <!-- Page Components -->
+    <script type="text/babel" src="HomePage.js"></script>
+    <script type="text/babel" src="ReaderPage.js"></script>
+    <script type="text/babel" src="LibraryPage.js"></script>
+    <script type="text/babel" src="ProfilePage.js"></script>
+    <script type="text/babel" src="LoginPage.js"></script>
+    <script type="text/babel" src="AdminPanel.js"></script>
+    
+    <!-- Legal Pages -->
+    <script type="text/babel" src="TermsPage.js"></script>
+    <script type="text/babel" src="PrivacyPage.js"></script>
+    <script type="text/babel" src="RefundPage.js"></script>
+    <script type="text/babel" src="ContactPage.js"></script>
+    
+    <!-- Main App -->
+    <script type="text/babel" src="App.js"></script>
+    
+    <!-- Simple Protection Script -->
+    <script>
+        // Basic console message
+        console.log('%c📚 BlueFM Novel', 'color: #4F46E5; font-size: 16px; font-weight: bold;');
+        console.log('%cContent is protected by copyright.', 'color: #6B7280; font-size: 12px;');
+        
+        // Only disable right-click on images
+        document.addEventListener('DOMContentLoaded', function() {
+            document.addEventListener('contextmenu', function(e) {
+                if (e.target.tagName === 'IMG') {
+                    e.preventDefault();
+                }
+            });
+        });
+    </script>
 </body>
 </html>
-
-
