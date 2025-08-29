@@ -17,7 +17,7 @@ const DataProvider = ({ children }) => {
     
     const NOVELS_PER_PAGE = 8;
     
-    // Initial load - fetch first batch of novels
+    // Initial load - fetch first batch of novels WITH chapters
     const loadInitialNovels = async () => {
         try {
             setLoading(true);
@@ -32,13 +32,19 @@ const DataProvider = ({ children }) => {
             
             if (!snapshot.empty) {
                 const novelsData = [];
-                snapshot.forEach(doc => {
+                
+                // Load each novel with its chapters
+                for (const doc of snapshot.docs) {
                     const data = doc.data();
-                    novelsData.push({
+                    
+                    // Create novel object with ACTUAL image from Firebase
+                    const novel = {
                         id: doc.id,
                         title: data.title || 'Untitled',
                         author: data.author || 'Unknown',
-                        coverImage: data.coverImage || data.coverUrl || '',
+                        // Use ONLY the saved image, no random images
+                        coverImage: data.coverImage || data.coverUrl || null,
+                        coverUrl: data.coverImage || data.coverUrl || null,
                         genre: data.genre || 'General',
                         status: data.status || 'Ongoing',
                         rating: data.rating || 0,
@@ -51,14 +57,64 @@ const DataProvider = ({ children }) => {
                         totalChapters: data.totalChapters || 0,
                         isPremium: data.isPremium || false,
                         createdAt: data.createdAt,
-                        updatedAt: data.updatedAt
-                    });
-                });
+                        updatedAt: data.updatedAt,
+                        chapters: [] // Initialize empty chapters array
+                    };
+                    
+                    // Now load chapters for this novel
+                    try {
+                        const chaptersSnapshot = await db.collection('novels')
+                            .doc(doc.id)
+                            .collection('chapters')
+                            .orderBy('chapterNumber', 'asc')
+                            .get();
+                        
+                        if (!chaptersSnapshot.empty) {
+                            const chapters = [];
+                            chaptersSnapshot.forEach(chapterDoc => {
+                                const chapterData = chapterDoc.data();
+                                chapters.push({
+                                    id: chapterDoc.id,
+                                    number: chapterData.chapterNumber || chapterData.number || 1,
+                                    chapterNumber: chapterData.chapterNumber || chapterData.number || 1,
+                                    title: chapterData.title || `Chapter ${chapterData.chapterNumber || chapterDoc.id}`,
+                                    content: chapterData.content || '',
+                                    isPremium: chapterData.isPremium || false,
+                                    isLocked: chapterData.isLocked || false,
+                                    readTime: chapterData.readTime || '5 min'
+                                });
+                            });
+                            novel.chapters = chapters;
+                            novel.totalChapters = chapters.length;
+                            console.log(`Loaded ${chapters.length} chapters for ${novel.title}`);
+                        } else {
+                            // Try to load from chapters array field if subcollection is empty
+                            if (data.chapters && Array.isArray(data.chapters)) {
+                                novel.chapters = data.chapters.map((ch, index) => ({
+                                    id: ch.id || `ch${index + 1}`,
+                                    number: ch.number || ch.chapterNumber || index + 1,
+                                    chapterNumber: ch.chapterNumber || ch.number || index + 1,
+                                    title: ch.title || `Chapter ${index + 1}`,
+                                    content: ch.content || '',
+                                    isPremium: ch.isPremium || false,
+                                    isLocked: ch.isLocked || false,
+                                    readTime: ch.readTime || '5 min'
+                                }));
+                                novel.totalChapters = novel.chapters.length;
+                                console.log(`Loaded ${novel.chapters.length} chapters from array for ${novel.title}`);
+                            }
+                        }
+                    } catch (chapterError) {
+                        console.error(`Error loading chapters for ${novel.title}:`, chapterError);
+                    }
+                    
+                    novelsData.push(novel);
+                }
                 
                 setNovels(novelsData);
                 setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
                 setHasMore(snapshot.docs.length === NOVELS_PER_PAGE);
-                console.log(`Loaded ${novelsData.length} novels`);
+                console.log(`Loaded ${novelsData.length} novels with chapters`);
             } else {
                 console.log('No novels found in database');
                 setHasMore(false);
@@ -87,13 +143,17 @@ const DataProvider = ({ children }) => {
             
             if (!snapshot.empty) {
                 const novelsData = [];
-                snapshot.forEach(doc => {
+                
+                for (const doc of snapshot.docs) {
                     const data = doc.data();
-                    novelsData.push({
+                    
+                    const novel = {
                         id: doc.id,
                         title: data.title || 'Untitled',
                         author: data.author || 'Unknown',
-                        coverImage: data.coverImage || data.coverUrl || '',
+                        // Use ONLY the saved image
+                        coverImage: data.coverImage || data.coverUrl || null,
+                        coverUrl: data.coverImage || data.coverUrl || null,
                         genre: data.genre || 'General',
                         status: data.status || 'Ongoing',
                         rating: data.rating || 0,
@@ -106,14 +166,50 @@ const DataProvider = ({ children }) => {
                         totalChapters: data.totalChapters || 0,
                         isPremium: data.isPremium || false,
                         createdAt: data.createdAt,
-                        updatedAt: data.updatedAt
-                    });
-                });
+                        updatedAt: data.updatedAt,
+                        chapters: []
+                    };
+                    
+                    // Load chapters
+                    try {
+                        const chaptersSnapshot = await db.collection('novels')
+                            .doc(doc.id)
+                            .collection('chapters')
+                            .orderBy('chapterNumber', 'asc')
+                            .get();
+                        
+                        if (!chaptersSnapshot.empty) {
+                            const chapters = [];
+                            chaptersSnapshot.forEach(chapterDoc => {
+                                const chapterData = chapterDoc.data();
+                                chapters.push({
+                                    id: chapterDoc.id,
+                                    number: chapterData.chapterNumber || chapterData.number || 1,
+                                    chapterNumber: chapterData.chapterNumber || chapterData.number || 1,
+                                    title: chapterData.title || `Chapter ${chapterData.chapterNumber}`,
+                                    content: chapterData.content || '',
+                                    isPremium: chapterData.isPremium || false,
+                                    isLocked: chapterData.isLocked || false,
+                                    readTime: chapterData.readTime || '5 min'
+                                });
+                            });
+                            novel.chapters = chapters;
+                            novel.totalChapters = chapters.length;
+                        } else if (data.chapters && Array.isArray(data.chapters)) {
+                            novel.chapters = data.chapters;
+                            novel.totalChapters = data.chapters.length;
+                        }
+                    } catch (chapterError) {
+                        console.error(`Error loading chapters for ${novel.title}:`, chapterError);
+                    }
+                    
+                    novelsData.push(novel);
+                }
                 
                 setNovels(prev => [...prev, ...novelsData]);
                 setLastVisible(snapshot.docs[snapshot.docs.length - 1]);
                 setHasMore(snapshot.docs.length === NOVELS_PER_PAGE);
-                console.log(`Loaded ${novelsData.length} more novels`);
+                console.log(`Loaded ${novelsData.length} more novels with chapters`);
             } else {
                 setHasMore(false);
             }
@@ -131,13 +227,48 @@ const DataProvider = ({ children }) => {
             return cachedNovels.get(novelId);
         }
         
+        // Check in already loaded novels
+        const existingNovel = novels.find(n => n.id === novelId);
+        if (existingNovel) {
+            return existingNovel;
+        }
+        
         try {
             const doc = await db.collection('novels').doc(novelId).get();
             if (doc.exists) {
+                const data = doc.data();
                 const novelData = {
                     id: doc.id,
-                    ...doc.data()
+                    ...data,
+                    coverImage: data.coverImage || data.coverUrl || null,
+                    coverUrl: data.coverImage || data.coverUrl || null
                 };
+                
+                // Load chapters for this novel
+                const chaptersSnapshot = await db.collection('novels')
+                    .doc(novelId)
+                    .collection('chapters')
+                    .orderBy('chapterNumber', 'asc')
+                    .get();
+                
+                if (!chaptersSnapshot.empty) {
+                    const chapters = [];
+                    chaptersSnapshot.forEach(chapterDoc => {
+                        const chapterData = chapterDoc.data();
+                        chapters.push({
+                            id: chapterDoc.id,
+                            number: chapterData.chapterNumber || 1,
+                            chapterNumber: chapterData.chapterNumber || 1,
+                            title: chapterData.title || `Chapter ${chapterData.chapterNumber}`,
+                            content: chapterData.content || '',
+                            isPremium: chapterData.isPremium || false,
+                            isLocked: chapterData.isLocked || false,
+                            readTime: chapterData.readTime || '5 min'
+                        });
+                    });
+                    novelData.chapters = chapters;
+                    novelData.totalChapters = chapters.length;
+                }
                 
                 // Cache the novel
                 setCachedNovels(prev => new Map(prev).set(novelId, novelData));
@@ -153,6 +284,12 @@ const DataProvider = ({ children }) => {
     // Get chapters list for a novel
     const getChaptersList = async (novelId) => {
         try {
+            // First check if novel already has chapters loaded
+            const novel = novels.find(n => n.id === novelId);
+            if (novel && novel.chapters && novel.chapters.length > 0) {
+                return novel.chapters;
+            }
+            
             console.log(`Loading chapters for novel: ${novelId}`);
             
             const snapshot = await db.collection('novels')
@@ -176,13 +313,8 @@ const DataProvider = ({ children }) => {
                 });
             });
             
-            console.log(`Loaded ${chapters.length} chapters`);
-            return chapters;
-        } catch (error) {
-            console.error('Error loading chapters:', error);
-            
-            // Try alternative structure (chapters as array field)
-            try {
+            if (chapters.length === 0) {
+                // Try alternative structure (chapters as array field)
                 const novelDoc = await db.collection('novels').doc(novelId).get();
                 if (novelDoc.exists) {
                     const data = novelDoc.data();
@@ -200,10 +332,12 @@ const DataProvider = ({ children }) => {
                         }));
                     }
                 }
-            } catch (altError) {
-                console.error('Alternative chapter loading also failed:', altError);
             }
             
+            console.log(`Loaded ${chapters.length} chapters`);
+            return chapters;
+        } catch (error) {
+            console.error('Error loading chapters:', error);
             return [];
         }
     };
@@ -215,6 +349,15 @@ const DataProvider = ({ children }) => {
         // Check cache first
         if (cachedChapters.has(cacheKey)) {
             return cachedChapters.get(cacheKey);
+        }
+        
+        // Check in already loaded novel
+        const novel = novels.find(n => n.id === novelId);
+        if (novel && novel.chapters) {
+            const chapter = novel.chapters.find(ch => ch.id === chapterId);
+            if (chapter) {
+                return chapter;
+            }
         }
         
         try {
@@ -293,7 +436,7 @@ const DataProvider = ({ children }) => {
                     id: doc.id,
                     title: data.title,
                     author: data.author,
-                    coverImage: data.coverImage || data.coverUrl,
+                    coverImage: data.coverImage || data.coverUrl || null,
                     genre: data.genre
                 });
             });
@@ -384,13 +527,19 @@ const DataProvider = ({ children }) => {
         const novel = novels.find(n => n.id === novelId);
         
         if (novel) {
+            let finalChapterTitle = chapterTitle;
+            if (!finalChapterTitle && novel.chapters) {
+                const chapter = novel.chapters.find(c => c.id === chapterId);
+                finalChapterTitle = chapter ? chapter.title : `Chapter ${chapterId}`;
+            }
+            
             setReadingHistory(prev => {
                 const filtered = prev.filter(h => !(h.novelId === novelId && h.chapterId === chapterId));
                 return [{
                     novelId,
                     chapterId,
                     novelTitle: novel.title,
-                    chapterTitle: chapterTitle || `Chapter ${chapterId}`,
+                    chapterTitle: finalChapterTitle || `Chapter ${chapterId}`,
                     timestamp: Date.now()
                 }, ...filtered].slice(0, 50);
             });
