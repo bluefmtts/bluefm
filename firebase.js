@@ -7,13 +7,13 @@ const getFirebaseConfig = () => {
     // For now, use direct config (we'll secure it during deployment)
     return {
         apiKey: "AIzaSyC6yENwSy7BixcQS7rf0eWKmTA5Vhh5Xbo",
-        authDomain: "tts-bot-db.firebaseapp.com",
-        databaseURL: "https://tts-bot-db-default-rtdb.firebaseio.com",
-        projectId: "tts-bot-db",
-        storageBucket: "tts-bot-db.firebasestorage.app",
-        messagingSenderId: "47722242167",
-        appId: "1:47722242167:web:b32537966a42d309b2e672",
-        measurementId: "G-NJ65LZ86KL"
+  authDomain: "tts-bot-db.firebaseapp.com",
+  databaseURL: "https://tts-bot-db-default-rtdb.firebaseio.com",
+  projectId: "tts-bot-db",
+  storageBucket: "tts-bot-db.firebasestorage.app",
+  messagingSenderId: "47722242167",
+  appId: "1:47722242167:web:75550df71113d97db2e672",
+  measurementId: "G-VGH8LNSS6M"
     };
 };
 
