@@ -1,18 +1,13 @@
 const { useState, useEffect, useRef, useContext } = React;
 
 const ReaderPage = ({ chapterData, setCurrentView }) => {
-    const { novel, chapterId, chapterNumber, chapterTitle } = chapterData;
-    const [currentChapter, setCurrentChapter] = useState({
-        id: chapterId,
-        number: chapterNumber,
-        title: chapterTitle
-    });
+    const { novel, chapter: initialChapter } = chapterData;
+    const [currentChapter, setCurrentChapter] = useState(initialChapter);
     const [chapterContent, setChapterContent] = useState(null);
-    const [chaptersInfo, setChaptersInfo] = useState([]); // Sirf IDs aur titles
+    const [chapters, setChapters] = useState([]);
     const [currentChapterIndex, setCurrentChapterIndex] = useState(0);
     const [loading, setLoading] = useState(true);
     const [navigating, setNavigating] = useState(false);
-    const [chaptersLoaded, setChaptersLoaded] = useState(false);
     
     const [fontSize, setFontSize] = useState(() => {
         const saved = localStorage.getItem('readerFontSize');
@@ -28,59 +23,39 @@ const ReaderPage = ({ chapterData, setCurrentView }) => {
     const { isDark, toggleTheme } = useContext(ThemeContext);
     const contentRef = useRef(null);
     
-    // Load ONLY current chapter content
+    // Initialize reader
     useEffect(() => {
-        loadCurrentChapter();
-    }, [chapterId]);
+        initializeReader();
+    }, [novel.id, initialChapter.id]);
     
-    const loadCurrentChapter = async () => {
+    const initializeReader = async () => {
         setLoading(true);
         try {
-            // Sirf current chapter ka content load karo
-            console.log(`Loading chapter ${chapterId} content only...`);
-            const content = await getChapterContent(novel.id, chapterId);
-            
-            if (content) {
-                setChapterContent(content.content || content);
-                // Add to history
-                addToHistory(novel.id, chapterId, chapterTitle);
-            } else {
-                setChapterContent('Chapter content not available.');
-            }
-        } catch (error) {
-            console.error('Error loading chapter:', error);
-            setChapterContent('Error loading chapter. Please try again.');
-        } finally {
-            setLoading(false);
-        }
-    };
-    
-    // Load chapters list ONLY when navigation is needed (lazy loading)
-    const loadChaptersListIfNeeded = async () => {
-        if (chaptersLoaded) return;
-        
-        try {
-            console.log('Loading chapters list for navigation...');
+            // Get chapters list
             const chaptersList = await getChaptersList(novel.id);
-            
-            // Sirf necessary info store karo
-            const lightChaptersList = chaptersList.map(ch => ({
-                id: ch.id,
-                number: ch.chapterNumber || ch.number,
-                title: ch.title
-            }));
-            
-            setChaptersInfo(lightChaptersList);
+            setChapters(chaptersList);
             
             // Find current chapter index
-            const index = lightChaptersList.findIndex(ch => ch.id === chapterId);
+            const index = chaptersList.findIndex(ch => ch.id === initialChapter.id);
             setCurrentChapterIndex(index >= 0 ? index : 0);
-            setChaptersLoaded(true);
             
-            return lightChaptersList;
+            // Load chapter content
+            let content = initialChapter.content;
+            if (!content) {
+                const chapterData = await getChapterContent(novel.id, initialChapter.id);
+                content = chapterData?.content || '';
+            }
+            
+            setChapterContent(content);
+            setCurrentChapter(chaptersList[index] || initialChapter);
+            
+            // Add to history
+            addToHistory(novel.id, initialChapter.id, initialChapter.title);
         } catch (error) {
-            console.error('Error loading chapters list:', error);
-            return [];
+            console.error('Error initializing reader:', error);
+            setChapterContent(initialChapter.content || 'Chapter content not available.');
+        } finally {
+            setLoading(false);
         }
     };
     
@@ -106,34 +81,19 @@ const ReaderPage = ({ chapterData, setCurrentView }) => {
     
     // Navigate to different chapter
     const navigateChapter = async (direction) => {
-        // First time navigation - load chapters list
-        let chaptersList = chaptersInfo;
-        if (!chaptersLoaded) {
-            setNavigating(true);
-            chaptersList = await loadChaptersListIfNeeded();
-            if (!chaptersList || chaptersList.length === 0) {
-                setNavigating(false);
-                return;
-            }
-        }
-        
         const newIndex = currentChapterIndex + direction;
         
-        if (newIndex < 0 || newIndex >= chaptersList.length) {
-            console.log('No more chapters in this direction');
-            return;
-        }
+        if (newIndex < 0 || newIndex >= chapters.length) return;
         
         setNavigating(true);
         try {
-            const targetChapter = chaptersList[newIndex];
+            const targetChapter = chapters[newIndex];
             
-            // Load ONLY the target chapter content
-            console.log(`Loading chapter ${targetChapter.id} content...`);
-            const content = await getChapterContent(novel.id, targetChapter.id);
+            // Load new chapter content
+            const chapterData = await getChapterContent(novel.id, targetChapter.id);
             
-            if (content) {
-                setChapterContent(content.content || content);
+            if (chapterData) {
+                setChapterContent(chapterData.content || '');
                 setCurrentChapter(targetChapter);
                 setCurrentChapterIndex(newIndex);
                 addToHistory(novel.id, targetChapter.id, targetChapter.title);
@@ -145,15 +105,13 @@ const ReaderPage = ({ chapterData, setCurrentView }) => {
             }
         } catch (error) {
             console.error('Error navigating chapter:', error);
-            alert('Failed to load chapter. Please try again.');
         } finally {
             setNavigating(false);
         }
     };
     
-    // Check if navigation is available
-    const hasPrev = chaptersLoaded ? currentChapterIndex > 0 : true; // Assume true until loaded
-    const hasNext = chaptersLoaded ? currentChapterIndex < chaptersInfo.length - 1 : true;
+    const hasPrev = currentChapterIndex > 0;
+    const hasNext = currentChapterIndex < chapters.length - 1;
     
     if (loading) {
         return (
@@ -185,7 +143,7 @@ const ReaderPage = ({ chapterData, setCurrentView }) => {
                                 {novel.title}
                             </h2>
                             <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
-                                Chapter {currentChapter.number}: {currentChapter.title}
+                                {currentChapter.title}
                             </p>
                         </div>
                         
@@ -194,7 +152,6 @@ const ReaderPage = ({ chapterData, setCurrentView }) => {
                                 <button
                                     onClick={() => setFontSize(Math.max(12, fontSize - 2))}
                                     className="p-2 rounded-l-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                    title="Decrease font size"
                                 >
                                     <Icon name="minus" className="w-4 h-4" />
                                 </button>
@@ -204,7 +161,6 @@ const ReaderPage = ({ chapterData, setCurrentView }) => {
                                 <button
                                     onClick={() => setFontSize(Math.min(24, fontSize + 2))}
                                     className="p-2 rounded-r-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                    title="Increase font size"
                                 >
                                     <Icon name="plus" className="w-4 h-4" />
                                 </button>
@@ -213,7 +169,6 @@ const ReaderPage = ({ chapterData, setCurrentView }) => {
                             <button
                                 onClick={toggleTheme}
                                 className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
-                                title={isDark ? "Light mode" : "Dark mode"}
                             >
                                 <Icon name={isDark ? "sun" : "moon"} className="w-5 h-5" />
                             </button>
@@ -238,7 +193,7 @@ const ReaderPage = ({ chapterData, setCurrentView }) => {
                 ) : (
                     <>
                         <h1 className="text-2xl font-bold mb-6 text-gray-900 dark:text-gray-100">
-                            Chapter {currentChapter.number}: {currentChapter.title}
+                            {currentChapter.title}
                         </h1>
                         
                         <div 
@@ -251,13 +206,6 @@ const ReaderPage = ({ chapterData, setCurrentView }) => {
                             <div className="whitespace-pre-wrap">
                                 {chapterContent || 'Chapter content not available.'}
                             </div>
-                        </div>
-                        
-                        {/* Chapter End Message */}
-                        <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800">
-                            <p className="text-center text-gray-500 dark:text-gray-400 text-sm">
-                                End of Chapter {currentChapter.number}
-                            </p>
                         </div>
                     </>
                 )}
@@ -281,10 +229,7 @@ const ReaderPage = ({ chapterData, setCurrentView }) => {
                         </button>
                         
                         <span className="text-sm text-gray-500 dark:text-gray-400">
-                            {chaptersLoaded 
-                                ? `Chapter ${currentChapterIndex + 1} of ${chaptersInfo.length}`
-                                : `Chapter ${currentChapter.number}`
-                            }
+                            Chapter {currentChapterIndex + 1} of {chapters.length}
                         </span>
                         
                         <button
