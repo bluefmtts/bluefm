@@ -6,6 +6,8 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
     const [chaptersLoading, setChaptersLoading] = useState(false);
     const [activeTab, setActiveTab] = useState('about');
     const [novelDetails, setNovelDetails] = useState(novel);
+    const [showAllChaptersButton, setShowAllChaptersButton] = useState(true);
+    const [chaptersVisible, setChaptersVisible] = useState(false);
     
     const { 
         bookmarks, 
@@ -19,7 +21,7 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
     const { user } = useContext(AuthContext);
     const isBookmarked = bookmarks.includes(novel.id);
     
-    // Load full novel details
+    // Load only novel details (NOT chapters)
     useEffect(() => {
         loadNovelDetails();
         incrementViewCount(novel.id);
@@ -32,28 +34,81 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
         }
     };
     
-    // Load chapters when tab changes to chapters
-    const handleTabChange = async (tab) => {
-        setActiveTab(tab);
+    // Load ONLY chapter list (titles, no content)
+    const loadChaptersList = async () => {
+        if (chapters.length > 0) {
+            setChaptersVisible(true);
+            return;
+        }
         
-        if (tab === 'chapters' && chapters.length === 0 && !chaptersLoading) {
-            setChaptersLoading(true);
-            try {
-                const chaptersList = await getChaptersList(novel.id);
-                setChapters(chaptersList);
-                console.log(`Loaded ${chaptersList.length} chapters for ${novel.title}`);
-            } catch (error) {
-                console.error('Error loading chapters:', error);
-            } finally {
-                setChaptersLoading(false);
-            }
+        setChaptersLoading(true);
+        try {
+            // Sirf chapter titles load karo, content nahi
+            const chaptersList = await getChaptersList(novel.id);
+            
+            // Map karo sirf necessary data
+            const lightChapters = chaptersList.map(ch => ({
+                id: ch.id,
+                chapterNumber: ch.chapterNumber || ch.number,
+                title: ch.title,
+                readTime: ch.readTime || '10 min'
+            }));
+            
+            setChapters(lightChapters);
+            setChaptersVisible(true);
+            setShowAllChaptersButton(false);
+            console.log(`Loaded ${lightChapters.length} chapter titles for ${novel.title}`);
+        } catch (error) {
+            console.error('Error loading chapters:', error);
+            alert('Failed to load chapters. Please try again.');
+        } finally {
+            setChaptersLoading(false);
+        }
+    };
+    
+    // Tab change handler - chapters load nahi karna automatically
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        // Chapters automatically load nahi honge
+        if (tab === 'chapters') {
+            // Show button to load chapters
+            setShowAllChaptersButton(true);
+            setChaptersVisible(false);
+        }
+    };
+    
+    // Chapter select karne pe sirf us chapter ka data load hoga
+    const handleChapterSelect = async (chapter) => {
+        // Loading indicator dikha sakte ho yahan
+        const loadingToast = document.createElement('div');
+        loadingToast.className = 'fixed top-4 right-4 bg-indigo-600 text-white px-4 py-2 rounded-lg z-50';
+        loadingToast.textContent = 'Loading chapter...';
+        document.body.appendChild(loadingToast);
+        
+        try {
+            // Chapter content ReaderPage me load hoga
+            setSelectedChapter({ 
+                novel: novelDetails, 
+                chapterId: chapter.id,
+                chapterNumber: chapter.chapterNumber,
+                chapterTitle: chapter.title
+            });
+            setCurrentView('reader');
+        } catch (error) {
+            console.error('Error selecting chapter:', error);
+        } finally {
+            // Remove loading toast
+            setTimeout(() => {
+                if (loadingToast.parentNode) {
+                    loadingToast.remove();
+                }
+            }, 500);
         }
     };
     
     const handleStartReading = () => {
         if (chapters.length > 0) {
-            setSelectedChapter({ novel: novelDetails, chapter: chapters[0] });
-            setCurrentView('reader');
+            handleChapterSelect(chapters[0]);
         } else {
             handleTabChange('chapters');
         }
@@ -71,7 +126,7 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
                     Back to Home
                 </button>
                 
-                {/* Novel Info */}
+                {/* Novel Info - Same as before */}
                 <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-lg border border-gray-200 dark:border-gray-800 p-6 mb-6 animate-fadeIn">
                     <div className="flex flex-col sm:flex-row gap-6">
                         <img 
@@ -171,7 +226,7 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
                                     : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
                             }`}
                         >
-                            Chapters ({novelDetails.totalChapters || chapters.length || 0})
+                            Chapters ({novelDetails.totalChapters || '?'})
                         </button>
                     </div>
                     
@@ -201,15 +256,37 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
                             </div>
                         )}
                         
-                        {/* Chapters Tab */}
+                        {/* Chapters Tab - OPTIMIZED */}
                         {activeTab === 'chapters' && (
                             <div className="animate-fadeIn">
-                                {chaptersLoading ? (
-                                    <div className="flex justify-center items-center py-12">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                                        <span className="ml-3 text-gray-600 dark:text-gray-400">Loading chapters...</span>
+                                {/* All Chapters Button */}
+                                {showAllChaptersButton && !chaptersVisible && (
+                                    <div className="text-center py-8">
+                                        <button
+                                            onClick={loadChaptersList}
+                                            disabled={chaptersLoading}
+                                            className="px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 mx-auto"
+                                        >
+                                            {chaptersLoading ? (
+                                                <>
+                                                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                                                    Loading...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <Icon name="book-open" className="w-5 h-5" />
+                                                    Show All Chapters
+                                                </>
+                                            )}
+                                        </button>
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                                            Click to view {novelDetails.totalChapters || 'all'} chapters
+                                        </p>
                                     </div>
-                                ) : chapters.length > 0 ? (
+                                )}
+                                
+                                {/* Chapters List */}
+                                {chaptersVisible && chapters.length > 0 && (
                                     <div className="space-y-2 max-h-96 overflow-y-auto pr-2">
                                         {chapters.map((chapter) => {
                                             const progressKey = `${novel.id}:${chapter.id}`;
@@ -218,17 +295,14 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
                                             return (
                                                 <div
                                                     key={chapter.id}
-                                                    onClick={() => {
-                                                        setSelectedChapter({ novel: novelDetails, chapter });
-                                                        setCurrentView('reader');
-                                                    }}
+                                                    onClick={() => handleChapterSelect(chapter)}
                                                     className="p-4 bg-gray-50 dark:bg-gray-800 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-all group"
                                                 >
                                                     <div className="flex items-center justify-between">
                                                         <div className="flex-1">
                                                             <div className="flex items-center gap-3">
                                                                 <span className="text-sm text-gray-500 dark:text-gray-400 font-medium">
-                                                                    Ch. {chapter.chapterNumber || chapter.number}
+                                                                    Ch. {chapter.chapterNumber}
                                                                 </span>
                                                                 <h3 className="font-semibold text-gray-900 dark:text-gray-100 group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
                                                                     {chapter.title}
@@ -236,7 +310,7 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
                                                             </div>
                                                             <div className="flex items-center gap-4 mt-1">
                                                                 <p className="text-sm text-gray-500 dark:text-gray-400">
-                                                                    {chapter.readTime || '10 min'}
+                                                                    {chapter.readTime}
                                                                 </p>
                                                                 {progress > 0 && (
                                                                     <div className="flex items-center gap-2">
@@ -259,7 +333,9 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
                                             );
                                         })}
                                     </div>
-                                ) : (
+                                )}
+                                
+                                {chaptersVisible && chapters.length === 0 && !chaptersLoading && (
                                     <p className="text-center text-gray-500 dark:text-gray-400 py-8">
                                         No chapters available yet
                                     </p>
