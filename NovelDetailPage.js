@@ -32,7 +32,7 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
         }
     };
     
-    // Load chapters when tab changes to chapters - DIRECTLY (no button)
+    // Load chapters when tab changes to chapters
     const handleTabChange = async (tab) => {
         setActiveTab(tab);
         
@@ -201,7 +201,7 @@ const NovelDetailPage = ({ novel, setCurrentView, setSelectedChapter }) => {
                             </div>
                         )}
                         
-                        {/* Chapters Tab - NO ALL CHAPTERS BUTTON */}
+                        {/* Chapters Tab */}
                         {activeTab === 'chapters' && (
                             <div className="animate-fadeIn">
                                 {chaptersLoading ? (
